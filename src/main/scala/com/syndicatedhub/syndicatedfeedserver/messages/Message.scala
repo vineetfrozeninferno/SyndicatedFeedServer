@@ -10,7 +10,7 @@ import scala.xml.Node
 
 trait Message
 
-case class PollFeedRequest(url: String, lastModified: Option[Long])
+case class PollFeedRequest(url: String, lastModified: Option[Long], lastStoredArticleTimeStamp: Option[Long])
 case class ChannelDetailsRequest(url: String)
 
 case class FeedItem(
@@ -40,9 +40,12 @@ object FeedItem {
       (itemNode \ "author").headOption.orElse((itemNode \ "creator").headOption).map(_.text),
       (itemNode \ "category").headOption.map(_.text),
       (itemNode \ "source").headOption.map(_.text).orElse(Some(sourceFeed)),
-      (itemNode \ "pubDate").headOption.map(dateElement => fmt.parseDateTime(dateElement.text).getMillis),
+      getPubDate(itemNode),
       (itemNode \ "thumbnail").flatMap(x => x.attribute("url")).flatten.headOption.map(_.text)
     )
+
+  def getPubDate(itemNode: Node): Option[Long] =
+    (itemNode \ "pubDate").headOption.map(dateElement => fmt.parseDateTime(dateElement.text).getMillis)
 
   implicit val jsonFormat: JsonFormat[FeedItem] = jsonFormat8(FeedItem.apply)
 }

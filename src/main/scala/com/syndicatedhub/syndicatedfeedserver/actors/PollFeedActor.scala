@@ -14,6 +14,8 @@ object PollFeedActor {
   val ifModifiedSinceHeaderKey = "If-Modified-Since"
 }
 
+// Actor that pings the feed urls, fetches the data and parses it into `FeedItem` objects.
+// This actor can also be used to fetch the channel details.
 class PollFeedActor extends Actor {
   val logger = Logger(getClass)
   val itemXmlElement = "item"
@@ -22,6 +24,8 @@ class PollFeedActor extends Actor {
   implicit val ec: ExecutionContext = this.context.dispatcher
 
   override def receive: Receive = {
+    // Fetch the items in the feed and convert into `FeedItem` objects. Channel details are ignored.
+    // Some feed servers support the `if-modified-since` header. The actor uses this feature, if possible, to reduce data processing.
     case request: PollFeedRequest =>
       Try {
         val url = new URL(request.url)
@@ -30,16 +34,24 @@ class PollFeedActor extends Actor {
 
         connection.connect()
         connection.getResponseCode match {
+          // if the server responds with 304, there are no updates to process.
           case 304 =>
             logger.info(s"No updates for ${request.url} since ${request.lastModified.get}")
             Seq.empty
+
+          // process the updates
           case _ =>
             val lastModified = Option(connection.getLastModified)
             FeedUrlsDb
               .insertEntry(new FeedsFetchOneKey(request.url), FeedUrlData(FeedUrlsDb.defaultRefreshIntervalInMins, lastModified))
             val xmlElement = scala.xml.XML.load(connection.getInputStream)
             val itemsXml = xmlElement \ channelXmlElement \ itemXmlElement
-            itemsXml.map(FeedItem(_, request.url))
+
+            val lastTimeStamp = request.lastStoredArticleTimeStamp.getOrElse(0L)
+
+            itemsXml
+              .filter(itemXML => FeedItem.getPubDate(itemXML).forall(_ >= lastTimeStamp))
+              .map(FeedItem(_, request.url))
         }
       } match {
         case Success(items) => sender() ! Option(PollFeedResponse(request, items))
@@ -48,6 +60,7 @@ class PollFeedActor extends Actor {
           sender() ! None
       }
 
+    // fetch only the details of the channel and does nothing about the feed items.
     case request: ChannelDetailsRequest =>
       Try {
         val url = new URL(request.url)

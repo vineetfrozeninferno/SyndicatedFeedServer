@@ -26,15 +26,15 @@ class RefreshFeedsActor @Inject()(@Named(GuiceModule.pollFeedActorName) pollFeed
   system.scheduler.schedule(0.seconds, FeedUrlsDb.defaultRefreshIntervalInMins.minutes, self, RefreshFeeds)
 
   private def processRefresh(feedUrl: String, lastModified: Option[Long]): Unit = {
-    val pollFeedRequest = PollFeedRequest(feedUrl, lastModified)
     val feedDataDbQuery = QueryKey(feedUrl, None, None)
     val currentTimeStamp = new DateTime().getMillis
     for {
-      latestSavedPoll <- FeedDataDb.query(feedDataDbQuery, Some(1))
+      latestSavedArticle <- FeedDataDb.query(feedDataDbQuery, Some(1))
+      lastStoredArticleTimeStampOpt = latestSavedArticle.headOption.map(_._2.flatMap(_.pubDate).max)
+      pollFeedRequest = PollFeedRequest(feedUrl, lastModified, lastStoredArticleTimeStampOpt)
       latestFeedQueryResponse <- (pollFeedActor ? pollFeedRequest).mapTo[Option[PollFeedResponse]]
     } yield {
-      val latestKnownEntryTimeStamp = latestSavedPoll.headOption.map(_._2.flatMap(_.pubDate).max).getOrElse(0L)
-
+      val latestKnownEntryTimeStamp = lastStoredArticleTimeStampOpt.getOrElse(0L)
       val items = latestFeedQueryResponse.map(_.items).getOrElse(Seq.empty)
       val filteredItems = items.filter(_.pubDate.exists(_ >= latestKnownEntryTimeStamp))
 
