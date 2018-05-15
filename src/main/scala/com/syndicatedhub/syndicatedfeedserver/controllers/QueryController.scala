@@ -6,7 +6,7 @@ import akka.util.Timeout
 import com.google.inject._
 import com.google.inject.name.Named
 import com.syndicatedhub.syndicatedfeedserver.GuiceModule
-import com.syndicatedhub.syndicatedfeedserver.datastorage.{FeedsDb, FeedsFetchOneKey}
+import com.syndicatedhub.syndicatedfeedserver.datastorage.{FeedUrlsDb, FeedsFetchOneKey}
 import com.syndicatedhub.syndicatedfeedserver.messages.{ChannelDetailsRequest, ChannelDetailsResponse}
 import play.api.Logger
 import play.api.mvc._
@@ -37,7 +37,7 @@ class QueryController @Inject()(
 
     channelDetailsFuture.map(_.flatten).flatMap(channelList => Future.sequence {
       channelList.map(channel => {
-        FeedsDb.insertEntry(new FeedsFetchOneKey(channel.request.url), FeedsDb.defaultRefreshIntervalInMins)
+        FeedUrlsDb.insertEntry(new FeedsFetchOneKey(channel.request.url), FeedUrlsDb.defaultRefreshIntervalInMins)
           .map(_ => channel.request.url)
       })
     }).map { results =>

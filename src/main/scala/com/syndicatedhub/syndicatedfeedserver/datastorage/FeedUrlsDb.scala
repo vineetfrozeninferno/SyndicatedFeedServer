@@ -4,8 +4,8 @@ import spray.json._
 import spray.json.DefaultJsonProtocol._
 
 trait FeedsDbKey extends DynamoDbKey
-object FeedsFetchAllKey extends QueryKey(FeedsDb.tableName, None, None) with FeedsDbKey
-class FeedsFetchOneKey(feedUrl: String) extends CompleteKey(FeedsDb.tableName, feedUrl) with FeedsDbKey {
+object FeedsFetchAllKey extends QueryKey(FeedUrlsDb.tableName, None, None) with FeedsDbKey
+class FeedsFetchOneKey(feedUrl: String) extends CompleteKey(FeedUrlsDb.tableName, feedUrl) with FeedsDbKey {
   def getFeedUrl: String = feedUrl
 }
 
@@ -15,12 +15,12 @@ object JsonFormatForFeedsDbKey extends JsonFormat[FeedsDbKey] {
     new FeedsFetchOneKey(feedUrl)
   }
   override def write(obj: FeedsDbKey): JsValue = obj match {
-    case key: FeedsFetchOneKey => CompleteKey(FeedsDb.tableName, key.getFeedUrl).toJson
+    case key: FeedsFetchOneKey => CompleteKey(FeedUrlsDb.tableName, key.getFeedUrl).toJson
     case FeedsFetchAllKey => throw new Exception(s"Cannot convert ${FeedsFetchAllKey.getClass} to json.")
   }
 }
 
-object FeedsDb extends LocalDynamoDbDataStorage[FeedsDbKey, Int] {
+object FeedUrlsDb extends LocalDynamoDbDataStorage[FeedsDbKey, Int] {
   override def tableName: String = "Feeds"
   override def partitionKeyName: String = tableName
   override def partitionKeyType: ScalarAttributeType = ScalarAttributeType.S
