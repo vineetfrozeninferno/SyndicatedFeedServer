@@ -1,1 +1,2 @@
 POST     /addSubscription                     com.syndicatedhub.syndicatedfeedserver.controllers.QueryController.addSubscription
+POST     /querySubscriptions                     com.syndicatedhub.syndicatedfeedserver.controllers.QueryController.querySubscriptions

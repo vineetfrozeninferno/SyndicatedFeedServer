@@ -9,6 +9,11 @@ class FeedsFetchOneKey(feedUrl: String) extends CompleteKey(FeedUrlsDb.tableName
   def getFeedUrl: String = feedUrl
 }
 
+case class FeedUrlData(refreshIntervalInMins: Int, lastModified: Option[Long])
+object FeedUrlData {
+  implicit val jsonFormatForFeedUrlData: JsonFormat[FeedUrlData] = jsonFormat2(FeedUrlData.apply)
+}
+
 object JsonFormatForFeedsDbKey extends JsonFormat[FeedsDbKey] {
   override def read(json: JsValue): FeedsDbKey = {
     val feedUrl = json.convertTo[CompleteKey].sortKey
@@ -20,13 +25,13 @@ object JsonFormatForFeedsDbKey extends JsonFormat[FeedsDbKey] {
   }
 }
 
-object FeedUrlsDb extends LocalDynamoDbDataStorage[FeedsDbKey, Int] {
+object FeedUrlsDb extends LocalDynamoDbDataStorage[FeedsDbKey, FeedUrlData] {
   override def tableName: String = "Feeds"
   override def partitionKeyName: String = tableName
   override def partitionKeyType: ScalarAttributeType = ScalarAttributeType.S
   override def sortKeyName: String = "FeedUrl"
   override def sortKeyType: ScalarAttributeType = ScalarAttributeType.S
-  implicit val jsonFormatForItem: JsonFormat[Int] = IntJsonFormat
+  implicit val jsonFormatForItem: JsonFormat[FeedUrlData] = FeedUrlData.jsonFormatForFeedUrlData
   override def dataAttribute: String = "refreshIntervalInMinutes"
 
   val defaultRefreshIntervalInMins = 10

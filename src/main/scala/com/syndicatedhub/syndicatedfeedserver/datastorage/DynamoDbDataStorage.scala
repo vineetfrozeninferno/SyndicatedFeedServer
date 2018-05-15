@@ -21,6 +21,16 @@ object CompleteKey {
   implicit val jsonFormatForCompleteKey: JsonFormat[CompleteKey] = jsonFormat2(CompleteKey.apply)
 }
 
+object DynamoDbKey {
+  object jsonFormatForDynamoKey extends JsonFormat[DynamoDbKey] {
+    override def read(json: JsValue): DynamoDbKey = json.convertTo[CompleteKey]
+    override def write(obj: DynamoDbKey): JsValue = obj match {
+      case key: CompleteKey => key.toJson
+      case _ => throw new Exception(s"Cannot convert $obj to json")
+    }
+  }
+}
+
 trait DynamoDbDataStorage[KEY <: DynamoDbKey, ITEM] extends BaseDataStorage[KEY, ITEM] {
   val logger = Logger(getClass)
 
@@ -49,7 +59,7 @@ trait DynamoDbDataStorage[KEY <: DynamoDbKey, ITEM] extends BaseDataStorage[KEY,
 
   private def keyToRawKey(keyValue: String, keyType: ScalarAttributeType): Any = keyType match {
     case ScalarAttributeType.S => keyValue
-    case ScalarAttributeType.N => keyValue.toInt
+    case ScalarAttributeType.N => keyValue.toLong
     case ScalarAttributeType.B => keyValue.toByte
   }
 
@@ -119,11 +129,19 @@ trait DynamoDbDataStorage[KEY <: DynamoDbKey, ITEM] extends BaseDataStorage[KEY,
     val itemToInsert = itemToDynamoItem(key, item)
     table.putItem(itemToInsert)
     item
+  }.recover {
+    case ex: Exception =>
+      logger.error(s"Encountered an error inserting data. key=$key.")
+      throw ex
   }
 
   private def readEntry(key: KEY)(implicit ec: ExecutionContext): Future[Option[(KEY,ITEM)]] = Future {
     val spec = new GetItemSpec().withPrimaryKey(dynamoDbKeyToPrimaryKey(key))
     Option(table.getItem(spec)).map(dynamoItemToItem)
+  }.recover {
+    case ex: Exception =>
+      logger.error(s"Encountered an error reading data. key=$key.")
+      throw ex
   }
 
   override def deleteEntry(key: KEY)(implicit ec: ExecutionContext): Future[Option[ITEM]] = {
@@ -135,6 +153,10 @@ trait DynamoDbDataStorage[KEY <: DynamoDbKey, ITEM] extends BaseDataStorage[KEY,
         val deleteItemSpec = new DeleteItemSpec().withPrimaryKey(dynamoDbKeyToPrimaryKey(key))
         Try(table.deleteItem(deleteItemSpec)).toOption.flatMap(x => deletedRow.map(_._2))
     }
+  }.recover {
+    case ex: Exception =>
+      logger.error(s"Encountered an error deleting data. key=$key.")
+      throw ex
   }
 
   override def query(key: KEY, numberOfResults: Option[Int])(implicit ec: ExecutionContext): Future[Map[KEY,ITEM]] = key match {
@@ -158,7 +180,15 @@ trait DynamoDbDataStorage[KEY <: DynamoDbKey, ITEM] extends BaseDataStorage[KEY,
           val condition = new RangeKeyCondition(sortKeyName).between(sortKeyToRawKey(low.get), sortKeyToRawKey(high.get))
           baseQuery.withRangeKeyCondition(condition)
       }
-      Future { table.query(query).iterator().asScala.toList.map(dynamoItemToItem).map(row => row._1 -> row._2).toMap }
+      Future {
+        val rawItems = table.query(query).iterator().asScala.toList
+        val results = rawItems.map(dynamoItemToItem).map(row => row._1 -> row._2).toMap
+        results
+      }.recover {
+        case ex: Exception =>
+          logger.error(s"Encountered an error querying data. key=$key.")
+          throw ex
+      }
   }
 }
 

@@ -10,7 +10,7 @@ import scala.xml.Node
 
 trait Message
 
-case class PollFeedRequest(url: String)
+case class PollFeedRequest(url: String, lastModified: Option[Long])
 case class ChannelDetailsRequest(url: String)
 
 case class FeedItem(
