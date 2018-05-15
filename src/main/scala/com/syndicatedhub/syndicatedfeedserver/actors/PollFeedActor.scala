@@ -50,7 +50,7 @@ class PollFeedActor extends Actor {
             val lastTimeStamp = request.lastStoredArticleTimeStamp.getOrElse(0L)
 
             itemsXml
-              .filter(itemXML => FeedItem.getPubDate(itemXML).forall(_ >= lastTimeStamp))
+              .filter(itemXML => FeedItem.getPubDate(itemXML).forall(_ >= lastTimeStamp)) // parse new feed-items only.
               .map(FeedItem(_, request.url))
         }
       } match {
