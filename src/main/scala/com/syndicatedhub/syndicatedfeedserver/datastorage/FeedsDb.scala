@@ -31,4 +31,5 @@ object FeedsDb extends LocalDynamoDbDataStorage[FeedsDbKey, Int] {
 
   val defaultRefreshIntervalInMins = 10
   override implicit val jsonFormatForKey: JsonFormat[FeedsDbKey] = JsonFormatForFeedsDbKey
+  override def scanForward: Boolean = true
 }

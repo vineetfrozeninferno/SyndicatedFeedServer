@@ -33,6 +33,8 @@ trait DynamoDbDataStorage[KEY <: DynamoDbKey, ITEM] extends BaseDataStorage[KEY,
   def sortKeyName: String
   def sortKeyType: ScalarAttributeType
 
+  def scanForward: Boolean
+
   implicit val jsonFormatForKey: JsonFormat[KEY]
   implicit val jsonFormatForItem: JsonFormat[ITEM]
 
@@ -135,14 +137,18 @@ trait DynamoDbDataStorage[KEY <: DynamoDbKey, ITEM] extends BaseDataStorage[KEY,
     }
   }
 
-  override def query(key: KEY)(implicit ec: ExecutionContext): Future[Map[KEY,ITEM]] = key match {
+  override def query(key: KEY, numberOfResults: Option[Int])(implicit ec: ExecutionContext): Future[Map[KEY,ITEM]] = key match {
     case _: CompleteKey => readEntry(key).map(_.map(row => Map(row._1 -> row._2)).getOrElse(Map.empty))
 
     case qKey: QueryKey if qKey.stopSortKey == qKey.startSortKey && qKey.startSortKey.isDefined =>
       readEntry(key).map(_.map(row => Map(row._1 -> row._2)).getOrElse(Map.empty))
 
     case qKey: QueryKey =>
-      val baseQuery = new QuerySpec().withHashKey(partitionKeyName, partitionKeyToRawKey(qKey.partitionKey))
+      val initialSpec = new QuerySpec()
+        .withHashKey(partitionKeyName, partitionKeyToRawKey(qKey.partitionKey))
+        .withScanIndexForward(scanForward)
+
+      val baseQuery = numberOfResults.map(initialSpec.withMaxResultSize).getOrElse(initialSpec)
 
       val query = (qKey.startSortKey, qKey.stopSortKey) match {
         case (None, None) => baseQuery
