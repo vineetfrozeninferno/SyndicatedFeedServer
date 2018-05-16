@@ -1,6 +1,6 @@
 package com.syndicatedhub.syndicatedfeedserver.actors
 
-import java.net.{CookieManager, CookiePolicy, HttpURLConnection, URL}
+import java.net.{HttpURLConnection, URL}
 
 import akka.actor.Actor
 import com.syndicatedhub.syndicatedfeedserver.datastorage.{FeedUrlData, FeedUrlsDb, FeedsFetchOneKey}
@@ -14,8 +14,6 @@ import scala.util.{Failure, Success, Try}
 object PollFeedActor {
   val ifModifiedSinceHeaderKey = "If-Modified-Since"
 
-  java.net.CookieHandler.setDefault( new CookieManager( null, CookiePolicy.ACCEPT_ALL ) )
-
   def getConnection(requestUrl: String, lastModifiedOpt: Option[Long]): HttpURLConnection = {
     val url = new URL(requestUrl)
     val connection = url.getProtocol.toLowerCase match {
@@ -24,7 +22,7 @@ object PollFeedActor {
     }
 
     lastModifiedOpt.foreach(lastMod => connection.setIfModifiedSince(lastMod))
-    connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; WOW64; rv:56.0) Gecko/20100101 Firefox/56.0")
+    connection.setRequestProperty("User-Agent", "curl/7.54.0")
     connection.connect()
     val debug = connection.getResponseCode
     connection
